@@ -12,6 +12,8 @@
 namespace CodeIgniter\Debug\Toolbar\Collectors;
 
 use CodeIgniter\Database\Query;
+use CodeIgniter\I18n\Time;
+use Config\Toolbar;
 
 /**
  * Collector for the Database tab of the Debug Toolbar.
@@ -77,7 +79,7 @@ class Database extends BaseCollector
      */
     public static function collect(Query $query)
     {
-        $config = config('Toolbar');
+        $config = config(Toolbar::class);
 
         // Provide default in case it's not set
         $max = $config->maxQueries ?: 100;
@@ -139,6 +141,7 @@ class Database extends BaseCollector
      */
     public function display(): array
     {
+        $data            = [];
         $data['queries'] = array_map(static function (array $query) {
             $isDuplicate = $query['duplicate'] === true;
 
@@ -184,7 +187,7 @@ class Database extends BaseCollector
                 'sql'        => $query['query']->debugToolbarDisplay(),
                 'trace'      => $query['trace'],
                 'trace-file' => $firstNonSystemLine,
-                'qid'        => md5($query['query'] . microtime()),
+                'qid'        => md5($query['query'] . Time::now()->format('0.u00 U')),
             ];
         }, static::$queries);
 
@@ -208,10 +211,8 @@ class Database extends BaseCollector
     {
         $this->getConnections();
 
-        $queryCount  = count(static::$queries);
-        $uniqueCount = count(array_filter(static::$queries, static function ($query) {
-            return $query['duplicate'] === false;
-        }));
+        $queryCount      = count(static::$queries);
+        $uniqueCount     = count(array_filter(static::$queries, static fn ($query) => $query['duplicate'] === false));
         $connectionCount = count($this->connections);
 
         return sprintf(

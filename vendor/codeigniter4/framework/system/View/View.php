@@ -13,6 +13,7 @@ namespace CodeIgniter\View;
 
 use CodeIgniter\Autoloader\FileLocator;
 use CodeIgniter\Debug\Toolbar\Collectors\Views;
+use CodeIgniter\Filters\DebugToolbar;
 use CodeIgniter\View\Exceptions\ViewException;
 use Config\Services;
 use Config\Toolbar;
@@ -25,6 +26,8 @@ use RuntimeException;
  */
 class View implements RendererInterface
 {
+    use ViewDecoratorTrait;
+
     /**
      * Data that is made available to the Views.
      *
@@ -167,21 +170,28 @@ class View implements RendererInterface
         // Store the results here so even if
         // multiple views are called in a view, it won't
         // clean it unless we mean it to.
-        $saveData                    = $saveData ?? $this->saveData;
-        $fileExt                     = pathinfo($view, PATHINFO_EXTENSION);
-        $realPath                    = empty($fileExt) ? $view . '.php' : $view; // allow Views as .html, .tpl, etc (from CI3)
-        $this->renderVars['view']    = $realPath;
+        $saveData ??= $this->saveData;
+
+        $fileExt = pathinfo($view, PATHINFO_EXTENSION);
+        // allow Views as .html, .tpl, etc (from CI3)
+        $this->renderVars['view'] = empty($fileExt) ? $view . '.php' : $view;
+
         $this->renderVars['options'] = $options ?? [];
 
         // Was it cached?
         if (isset($this->renderVars['options']['cache'])) {
-            $cacheName = $this->renderVars['options']['cache_name'] ?? str_replace('.php', '', $this->renderVars['view']);
+            $cacheName = $this->renderVars['options']['cache_name']
+                ?? str_replace('.php', '', $this->renderVars['view']);
             $cacheName = str_replace(['\\', '/'], '', $cacheName);
 
             $this->renderVars['cacheName'] = $cacheName;
 
             if ($output = cache($this->renderVars['cacheName'])) {
-                $this->logPerformance($this->renderVars['start'], microtime(true), $this->renderVars['view']);
+                $this->logPerformance(
+                    $this->renderVars['start'],
+                    microtime(true),
+                    $this->renderVars['view']
+                );
 
                 return $output;
             }
@@ -190,7 +200,11 @@ class View implements RendererInterface
         $this->renderVars['file'] = $this->viewPath . $this->renderVars['view'];
 
         if (! is_file($this->renderVars['file'])) {
-            $this->renderVars['file'] = $this->loader->locateFile($this->renderVars['view'], 'Views', empty($fileExt) ? 'php' : $fileExt);
+            $this->renderVars['file'] = $this->loader->locateFile(
+                $this->renderVars['view'],
+                'Views',
+                empty($fileExt) ? 'php' : $fileExt
+            );
         }
 
         // locateFile will return an empty string if the file cannot be found.
@@ -228,10 +242,18 @@ class View implements RendererInterface
             $this->renderVars = $renderVars;
         }
 
-        $this->logPerformance($this->renderVars['start'], microtime(true), $this->renderVars['view']);
+        $output = $this->decorateOutput($output);
 
-        if (($this->debug && (! isset($options['debug']) || $options['debug'] === true))
-            && in_array('CodeIgniter\Filters\DebugToolbar', service('filters')->getFiltersClass()['after'], true)
+        $this->logPerformance(
+            $this->renderVars['start'],
+            microtime(true),
+            $this->renderVars['view']
+        );
+
+        $afterFilters = service('filters')->getFiltersClass()['after'];
+        if (
+            ($this->debug && (! isset($options['debug']) || $options['debug'] === true))
+            && in_array(DebugToolbar::class, $afterFilters, true)
         ) {
             $toolbarCollectors = config(Toolbar::class)->collectors;
 
@@ -248,7 +270,11 @@ class View implements RendererInterface
 
         // Should we cache?
         if (isset($this->renderVars['options']['cache'])) {
-            cache()->save($this->renderVars['cacheName'], $output, (int) $this->renderVars['options']['cache']);
+            cache()->save(
+                $this->renderVars['cacheName'],
+                $output,
+                (int) $this->renderVars['options']['cache']
+            );
         }
 
         $this->tempData = null;
@@ -271,8 +297,8 @@ class View implements RendererInterface
      */
     public function renderString(string $view, ?array $options = null, ?bool $saveData = null): string
     {
-        $start    = microtime(true);
-        $saveData = $saveData ?? $this->saveData;
+        $start = microtime(true);
+        $saveData ??= $this->saveData;
         $this->prepareTemplateData($saveData);
 
         $output = (function (string $view): string {
@@ -300,8 +326,9 @@ class View implements RendererInterface
     /**
      * Sets several pieces of view data at once.
      *
-     * @param string $context The context to escape it for: html, css, js, url
-     *                        If null, no escaping will happen
+     * @param string|null $context The context to escape it for: html, css, js, url
+     *                             If null, no escaping will happen
+     * @phpstan-param null|'html'|'js'|'css'|'url'|'attr'|'raw' $context
      */
     public function setData(array $data = [], ?string $context = null): RendererInterface
     {
@@ -309,7 +336,7 @@ class View implements RendererInterface
             $data = \esc($data, $context);
         }
 
-        $this->tempData = $this->tempData ?? $this->data;
+        $this->tempData ??= $this->data;
         $this->tempData = array_merge($this->tempData, $data);
 
         return $this;
@@ -321,6 +348,7 @@ class View implements RendererInterface
      * @param mixed       $value
      * @param string|null $context The context to escape it for: html, css, js, url
      *                             If null, no escaping will happen
+     * @phpstan-param null|'html'|'js'|'css'|'url'|'attr'|'raw' $context
      */
     public function setVar(string $name, $value = null, ?string $context = null): RendererInterface
     {
@@ -328,7 +356,7 @@ class View implements RendererInterface
             $value = esc($value, $context);
         }
 
-        $this->tempData        = $this->tempData ?? $this->data;
+        $this->tempData ??= $this->data;
         $this->tempData[$name] = $value;
 
         return $this;
@@ -449,7 +477,7 @@ class View implements RendererInterface
 
     protected function prepareTemplateData(bool $saveData): void
     {
-        $this->tempData = $this->tempData ?? $this->data;
+        $this->tempData ??= $this->data;
 
         if ($saveData) {
             $this->data = $this->tempData;

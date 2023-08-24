@@ -11,6 +11,7 @@
 
 namespace CodeIgniter\Cache\Handlers;
 
+use CodeIgniter\I18n\Time;
 use Config\Cache;
 use Exception;
 
@@ -21,6 +22,9 @@ use Exception;
  */
 class WincacheHandler extends BaseHandler
 {
+    /**
+     * Note: Use `CacheFactory::getHandler()` to instantiate.
+     */
     public function __construct(Cache $config)
     {
         $this->prefix = $config->prefix;
@@ -124,7 +128,7 @@ class WincacheHandler extends BaseHandler
             $hitcount = $stored['ucache_entries'][1]['hitcount'];
 
             return [
-                'expire'   => $ttl > 0 ? time() + $ttl : null,
+                'expire'   => $ttl > 0 ? Time::now()->getTimestamp() + $ttl : null,
                 'hitcount' => $hitcount,
                 'age'      => $age,
                 'ttl'      => $ttl,

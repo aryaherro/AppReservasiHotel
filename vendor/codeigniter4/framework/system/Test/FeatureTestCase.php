@@ -148,9 +148,6 @@ class FeatureTestCase extends CIUnitTestCase
      * Calls a single URI, executes it, and returns a FeatureResponse
      * instance that can be used to run many assertions against.
      *
-     * @throws Exception
-     * @throws RedirectException
-     *
      * @return FeatureResponse
      */
     public function call(string $method, string $path, ?array $params = null)
@@ -159,11 +156,9 @@ class FeatureTestCase extends CIUnitTestCase
 
         // Clean up any open output buffers
         // not relevant to unit testing
-        // @codeCoverageIgnoreStart
         if (\ob_get_level() > 0 && (! isset($this->clean) || $this->clean === true)) {
-            \ob_end_clean();
+            \ob_end_clean(); // @codeCoverageIgnore
         }
-        // @codeCoverageIgnoreEnd
 
         // Simulate having a blank session
         $_SESSION                  = [];
@@ -176,12 +171,7 @@ class FeatureTestCase extends CIUnitTestCase
 
         // Initialize the RouteCollection
         if (! $routes = $this->routes) {
-            require APPPATH . 'Config/Routes.php';
-
-            /**
-             * @var RouteCollection $routes
-             */
-            $routes->getRoutes('*');
+            $routes = Services::routes()->loadRoutes();
         }
 
         $routes->setHTTPVerb($method);
@@ -194,6 +184,7 @@ class FeatureTestCase extends CIUnitTestCase
         Services::injectMock('filters', Services::filters(null, false));
 
         $response = $this->app
+            ->setContext('web')
             ->setRequest($request)
             ->run($routes, true);
 
@@ -206,15 +197,13 @@ class FeatureTestCase extends CIUnitTestCase
         Services::router()->setDirectory(null);
 
         // Ensure the output buffer is identical so no tests are risky
-        // @codeCoverageIgnoreStart
         while (\ob_get_level() > $buffer) {
-            \ob_end_clean();
+            \ob_end_clean(); // @codeCoverageIgnore
         }
 
         while (\ob_get_level() < $buffer) {
-            \ob_start();
+            \ob_start(); // @codeCoverageIgnore
         }
-        // @codeCoverageIgnoreEnd
 
         return new FeatureResponse($response);
     }
@@ -222,10 +211,10 @@ class FeatureTestCase extends CIUnitTestCase
     /**
      * Performs a GET request.
      *
+     * @return FeatureResponse
+     *
      * @throws Exception
      * @throws RedirectException
-     *
-     * @return FeatureResponse
      */
     public function get(string $path, ?array $params = null)
     {
@@ -235,10 +224,10 @@ class FeatureTestCase extends CIUnitTestCase
     /**
      * Performs a POST request.
      *
+     * @return FeatureResponse
+     *
      * @throws Exception
      * @throws RedirectException
-     *
-     * @return FeatureResponse
      */
     public function post(string $path, ?array $params = null)
     {
@@ -248,10 +237,10 @@ class FeatureTestCase extends CIUnitTestCase
     /**
      * Performs a PUT request
      *
+     * @return FeatureResponse
+     *
      * @throws Exception
      * @throws RedirectException
-     *
-     * @return FeatureResponse
      */
     public function put(string $path, ?array $params = null)
     {
@@ -261,10 +250,10 @@ class FeatureTestCase extends CIUnitTestCase
     /**
      * Performss a PATCH request
      *
+     * @return FeatureResponse
+     *
      * @throws Exception
      * @throws RedirectException
-     *
-     * @return FeatureResponse
      */
     public function patch(string $path, ?array $params = null)
     {
@@ -274,10 +263,10 @@ class FeatureTestCase extends CIUnitTestCase
     /**
      * Performs a DELETE request.
      *
+     * @return FeatureResponse
+     *
      * @throws Exception
      * @throws RedirectException
-     *
-     * @return FeatureResponse
      */
     public function delete(string $path, ?array $params = null)
     {
@@ -287,10 +276,10 @@ class FeatureTestCase extends CIUnitTestCase
     /**
      * Performs an OPTIONS request.
      *
+     * @return FeatureResponse
+     *
      * @throws Exception
      * @throws RedirectException
-     *
-     * @return FeatureResponse
      */
     public function options(string $path, ?array $params = null)
     {
@@ -339,9 +328,9 @@ class FeatureTestCase extends CIUnitTestCase
      *
      * Always populate the GET vars based on the URI.
      *
-     * @throws ReflectionException
-     *
      * @return Request
+     *
+     * @throws ReflectionException
      */
     protected function populateGlobals(string $method, Request $request, ?array $params = null)
     {
@@ -349,7 +338,7 @@ class FeatureTestCase extends CIUnitTestCase
         // otherwise set it from the URL.
         $get = ! empty($params) && $method === 'get'
             ? $params
-            : $this->getPrivateProperty($request->uri, 'query');
+            : $this->getPrivateProperty($request->getUri(), 'query');
 
         $request->setGlobal('get', $get);
         if ($method !== 'get') {

@@ -12,7 +12,9 @@
 namespace CodeIgniter\Test;
 
 use CodeIgniter\Exceptions\FrameworkException;
+use CodeIgniter\I18n\Time;
 use CodeIgniter\Model;
+use Config\App;
 use Faker\Factory;
 use Faker\Generator;
 use InvalidArgumentException;
@@ -113,7 +115,7 @@ class Fabricator
 
         // If no locale was specified then use the App default
         if ($locale === null) {
-            $locale = config('App')->defaultLocale;
+            $locale = config(App::class)->defaultLocale;
         }
 
         // There is no easy way to retrieve the locale from Faker so we will store it
@@ -364,9 +366,9 @@ class Fabricator
     /**
      * Generate an array of faked data
      *
-     * @throws RuntimeException
-     *
      * @return array An array of faked data
+     *
+     * @throws RuntimeException
      */
     public function makeArray()
     {
@@ -374,7 +376,7 @@ class Fabricator
             $result = [];
 
             foreach ($this->formatters as $field => $formatter) {
-                $result[$field] = $this->faker->{$formatter};
+                $result[$field] = $this->faker->{$formatter}();
             }
         }
         // If no formatters were defined then look for a model fake() method
@@ -401,9 +403,9 @@ class Fabricator
      *
      * @param string|null $className Class name of the object to create; null to use model default
      *
-     * @throws RuntimeException
-     *
      * @return object An instance of the class with faked data
+     *
+     * @throws RuntimeException
      */
     public function makeObject(?string $className = null): object
     {
@@ -451,9 +453,9 @@ class Fabricator
      * @param int|null $count Optional number to create a collection
      * @param bool     $mock  Whether to execute or mock the insertion
      *
-     * @throws FrameworkException
-     *
      * @return array|object An array or object (based on returnType), or an array of returnTypes
+     *
+     * @throws FrameworkException
      */
     public function create(?int $count = null, bool $mock = false)
     {
@@ -503,7 +505,7 @@ class Fabricator
                 break;
 
             default:
-                $datetime = time();
+                $datetime = Time::now()->getTimestamp();
         }
 
         // Determine which fields we will need
